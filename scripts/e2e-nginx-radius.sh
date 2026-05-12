@@ -8,6 +8,8 @@ ENVIRONMENT="${ENVIRONMENT:-default}"
 WORKSPACE="${WORKSPACE:-default}"
 APP_NAME="${APP_NAME:-nginx-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-nginx-radius-demo}"
+RECIPE_PACK_NAME="${RECIPE_PACK_NAME:-nginx-radius-demo-pack}"
+RECIPE_PACK_FILE="${CONTRIB_DIR}/nginx-radius-demo-recipe-pack.bicep"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -33,18 +35,43 @@ make build-bicep-recipe RECIPE_PATH=Compute/gateways/recipes/kubernetes/bicep/ng
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
 make build-bicep-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/bicep/kubernetes-routes.bicep
 
-./.github/scripts/register-recipe.sh Compute/gateways/recipes/kubernetes/bicep "${ENVIRONMENT}" "${WORKSPACE}"
-./.github/scripts/register-recipe.sh Compute/containers/recipes/kubernetes/bicep "${ENVIRONMENT}" "${WORKSPACE}"
+cat > "${RECIPE_PACK_FILE}" <<EOF
+extension radius
 
-rad recipe register default \
-  --workspace "${WORKSPACE}" \
-  --environment "${ENVIRONMENT}" \
-  --resource-type Radius.Compute/routes \
-  --template-kind bicep \
-  --template-path reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest \
-  --parameters gatewayName=web \
-  --parameters gatewayNamespace="${APP_NAMESPACE}" \
-  --plain-http
+resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
+  name: '${RECIPE_PACK_NAME}'
+  location: 'global'
+  properties: {
+    recipes: {
+      'Radius.Compute/gateways': {
+        recipeKind: 'bicep'
+        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/gateways/kubernetes/bicep/nginx-gateway:latest'
+        plainHttp: true
+      }
+      'Radius.Compute/containers': {
+        recipeKind: 'bicep'
+        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/containers/kubernetes/bicep/kubernetes-containers:latest'
+        plainHttp: true
+      }
+      'Radius.Compute/routes': {
+        recipeKind: 'bicep'
+        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
+        plainHttp: true
+        parameters: {
+          gatewayName: 'web'
+          gatewayNamespace: '${APP_NAMESPACE}'
+        }
+      }
+    }
+  }
+}
+EOF
+
+rad deploy "${RECIPE_PACK_FILE}" --group default -e "${ENVIRONMENT}"
+rad env update "${ENVIRONMENT}" --recipe-packs "${RECIPE_PACK_NAME}" --preview
+
+cp ./*-extension.tgz "${ROOT_DIR}/"
+cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 
 rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}"
 
