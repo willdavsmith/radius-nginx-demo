@@ -18,7 +18,7 @@ require_command() {
   fi
 }
 
-for cmd in docker kind kubectl helm rad curl jq oras; do
+for cmd in docker kind kubectl helm rad curl jq oras zip; do
   require_command "$cmd"
 done
 
@@ -31,9 +31,9 @@ make build-resource-type TYPE_FOLDER=Compute/gateways
 make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes
 
-make build-bicep-recipe RECIPE_PATH=Compute/gateways/recipes/kubernetes/bicep/nginx-gateway.bicep
+make build-terraform-recipe RECIPE_PATH=Compute/gateways/recipes/kubernetes/terraform
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
-make build-bicep-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/bicep/kubernetes-routes.bicep
+make build-terraform-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/terraform
 
 cat > "${RECIPE_PACK_FILE}" <<EOF
 extension radius
@@ -44,9 +44,8 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
   properties: {
     recipes: {
       'Radius.Compute/gateways': {
-        recipeKind: 'bicep'
-        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/gateways/kubernetes/bicep/nginx-gateway:latest'
-        plainHttp: true
+        recipeKind: 'terraform'
+        recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/gateways-kubernetes.zip'
       }
       'Radius.Compute/containers': {
         recipeKind: 'bicep'
@@ -54,12 +53,11 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         plainHttp: true
       }
       'Radius.Compute/routes': {
-        recipeKind: 'bicep'
-        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
-        plainHttp: true
+        recipeKind: 'terraform'
+        recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/routes-kubernetes.zip'
         parameters: {
-          gatewayName: 'web'
-          gatewayNamespace: '${APP_NAMESPACE}'
+          gateway_name: 'web'
+          gateway_namespace: '${APP_NAMESPACE}'
         }
       }
     }

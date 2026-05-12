@@ -3,4 +3,4 @@
 	url = https://github.com/radius-project/radius.git
 [submodule "submodules/resource-types-contrib"]
 	path = submodules/resource-types-contrib
-	url = https://github.com/radius-project/resource-types-contrib.git
+	url = https://github.com/willdavsmith/resource-types-contrib.git
