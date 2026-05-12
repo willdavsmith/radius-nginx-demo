@@ -34,6 +34,7 @@ resource web 'Radius.Compute/containers@2025-08-01-preview' = {
   properties: {
     environment: environment
     application: app.id
+    connections: {}
     containers: {
       web: {
         image: 'nginx:alpine'
