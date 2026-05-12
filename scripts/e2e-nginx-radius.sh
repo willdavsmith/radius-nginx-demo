@@ -76,7 +76,25 @@ cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}"
 
 kubectl wait --timeout=5m -n "${APP_NAMESPACE}" gateway/web --for=condition=Programmed
-kubectl wait --timeout=5m -n "${APP_NAMESPACE}" httproute --all --for=condition=Accepted
+for _ in {1..30}; do
+  ROUTE_STATUS="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '
+    .items as $routes |
+    if ($routes | length) == 0 then "waiting"
+    elif ([ $routes[].status.parents[]?.conditions[]? | select(.type == "Accepted" and .status == "True") ] | length) >= ($routes | length) then "accepted"
+    else "waiting"
+    end
+  ')"
+  if [[ "${ROUTE_STATUS}" == "accepted" ]]; then
+    break
+  fi
+  sleep 10
+done
+
+if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
+  echo "E2E failed: HTTPRoute was not accepted." >&2
+  kubectl get httproute -n "${APP_NAMESPACE}" -o yaml >&2 || true
+  exit 1
+fi
 
 SERVICE_NAME="$(kubectl get service -n "${APP_NAMESPACE}" -l gateway.networking.k8s.io/gateway-name=web -o jsonpath='{.items[0].metadata.name}')"
 kubectl port-forward -n "${APP_NAMESPACE}" "service/${SERVICE_NAME}" 8080:80 >/tmp/radius-nginx-demo-port-forward.log 2>&1 &
