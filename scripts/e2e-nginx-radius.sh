@@ -25,6 +25,8 @@ done
 cd "${CONTRIB_DIR}"
 
 make create-radius-cluster
+kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${APP_NAMESPACE}"
+rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
 "${ROOT_DIR}/scripts/install-nginx-gateway-fabric.sh"
 
 make build-resource-type TYPE_FOLDER=Compute/gateways

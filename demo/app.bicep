@@ -9,12 +9,6 @@ resource app 'Radius.Core/applications@2025-08-01-preview' = {
   name: 'nginx-radius-demo'
   properties: {
     environment: environment
-    extensions: [
-      {
-        kind: 'kubernetesNamespace'
-        namespace: 'default-nginx-radius-demo'
-      }
-    ]
   }
 }
 
