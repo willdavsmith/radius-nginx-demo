@@ -110,21 +110,28 @@ if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
   exit 1
 fi
 
+ENVOY_SERVICE_NAMESPACE=""
 for _ in {1..30}; do
+  if kubectl get service -n "${APP_NAMESPACE}" envoy >/dev/null 2>&1; then
+    ENVOY_SERVICE_NAMESPACE="${APP_NAMESPACE}"
+    break
+  fi
   if kubectl get service -n "${CONTOUR_NAMESPACE}" envoy >/dev/null 2>&1; then
+    ENVOY_SERVICE_NAMESPACE="${CONTOUR_NAMESPACE}"
     break
   fi
   sleep 5
 done
 
-if ! kubectl get service -n "${CONTOUR_NAMESPACE}" envoy >/dev/null 2>&1; then
+if [[ -z "${ENVOY_SERVICE_NAMESPACE}" ]]; then
   echo "E2E failed: Contour Envoy service was not created." >&2
   kubectl get gateway -n "${APP_NAMESPACE}" -o yaml >&2 || true
+  kubectl get pods,svc -n "${APP_NAMESPACE}" >&2 || true
   kubectl get pods,svc -n "${CONTOUR_NAMESPACE}" >&2 || true
   exit 1
 fi
 
-kubectl port-forward -n "${CONTOUR_NAMESPACE}" service/envoy 8080:80 >/tmp/radius-contour-demo-port-forward.log 2>&1 &
+kubectl port-forward -n "${ENVOY_SERVICE_NAMESPACE}" service/envoy 8080:80 >/tmp/radius-contour-demo-port-forward.log 2>&1 &
 PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
