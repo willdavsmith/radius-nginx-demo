@@ -111,13 +111,21 @@ if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
 fi
 
 ENVOY_SERVICE_NAMESPACE=""
+ENVOY_SERVICE_NAME=""
 for _ in {1..30}; do
+  if kubectl get service -n "${APP_NAMESPACE}" envoy-web >/dev/null 2>&1; then
+    ENVOY_SERVICE_NAMESPACE="${APP_NAMESPACE}"
+    ENVOY_SERVICE_NAME="envoy-web"
+    break
+  fi
   if kubectl get service -n "${APP_NAMESPACE}" envoy >/dev/null 2>&1; then
     ENVOY_SERVICE_NAMESPACE="${APP_NAMESPACE}"
+    ENVOY_SERVICE_NAME="envoy"
     break
   fi
   if kubectl get service -n "${CONTOUR_NAMESPACE}" envoy >/dev/null 2>&1; then
     ENVOY_SERVICE_NAMESPACE="${CONTOUR_NAMESPACE}"
+    ENVOY_SERVICE_NAME="envoy"
     break
   fi
   sleep 5
@@ -131,7 +139,7 @@ if [[ -z "${ENVOY_SERVICE_NAMESPACE}" ]]; then
   exit 1
 fi
 
-kubectl port-forward -n "${ENVOY_SERVICE_NAMESPACE}" service/envoy 8080:80 >/tmp/radius-contour-demo-port-forward.log 2>&1 &
+kubectl port-forward -n "${ENVOY_SERVICE_NAMESPACE}" "service/${ENVOY_SERVICE_NAME}" 8080:80 >/tmp/radius-contour-demo-port-forward.log 2>&1 &
 PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
