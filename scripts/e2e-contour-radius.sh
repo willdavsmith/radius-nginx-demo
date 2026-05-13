@@ -11,9 +11,14 @@ GATEWAY_CLASS_NAME="${GATEWAY_CLASS_NAME:-contour}"
 CONTOUR_NAMESPACE="${CONTOUR_NAMESPACE:-projectcontour}"
 RECIPE_PACK_NAME="${RECIPE_PACK_NAME:-contour-radius-demo-pack}"
 RECIPE_PACK_FILE="${CONTRIB_DIR}/contour-radius-demo-recipe-pack.bicep"
+ORIGINAL_HOME="${HOME}"
 E2E_HOME="${E2E_HOME:-$(mktemp -d)}"
 export HOME="${E2E_HOME}"
 mkdir -p "${HOME}"
+if [[ -d "${ORIGINAL_HOME}/.rad/bin" && ! -e "${HOME}/.rad/bin" ]]; then
+  mkdir -p "${HOME}/.rad"
+  ln -s "${ORIGINAL_HOME}/.rad/bin" "${HOME}/.rad/bin"
+fi
 
 if (( BASH_VERSINFO[0] < 4 )); then
   echo "Error: this e2e requires Bash 4 or newer because resource-types-contrib build scripts use Bash 4 features." >&2
