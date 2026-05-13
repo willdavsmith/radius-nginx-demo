@@ -1,13 +1,13 @@
-# Radius + NGINX Gateway Fabric Demo
+# Radius Gateway Controller Demos
 
-This repository demonstrates replacing Radius' Contour-based ingress dependency with NGINX Gateway Fabric for Kubernetes ingress.
+This repository demonstrates running Radius with built-in Contour installation disabled, then adding an ingress implementation explicitly through installer scripts and Radius recipes.
 
 The workspace pins two upstream repositories as submodules:
 
 - `submodules/radius`: Radius source, on branch `replace-contour-with-nginx-demo`.
 - `submodules/resource-types-contrib`: contributed Radius resource types and recipes, including the nginx Gateway recipe added for this demo.
 
-## What The Demo Does
+## NGINX Gateway Fabric Demo
 
 1. Creates a local kind cluster.
 2. Installs Radius with Contour skipped.
@@ -18,11 +18,20 @@ The workspace pins two upstream repositories as submodules:
 
 ## Run Locally
 
-Prerequisites: Docker, kind, kubectl, Helm, wget, curl, jq, and oras.
+Prerequisites: Bash 4 or newer, Docker, kind, kubectl, Helm, wget, curl, jq, and oras.
 
 ```bash
 git submodule update --init --recursive
 ./scripts/e2e-nginx-radius.sh
+```
+
+## Contour Gateway API Demo
+
+The Contour demo follows the same pattern, but installs Contour after Radius via the Contour Gateway Provisioner and uses the same Gateway API recipes with `gatewayClassName=contour`.
+
+```bash
+git submodule update --init --recursive
+./scripts/e2e-contour-radius.sh
 ```
 
 The script leaves the cluster running for inspection. Clean it up with:
@@ -35,3 +44,5 @@ docker rm -f reciperegistry
 ## Notes
 
 NGINX Gateway Fabric currently installs from the official OCI Helm chart at `oci://ghcr.io/nginx/charts/nginx-gateway-fabric`. Its documentation requires Gateway API CRDs before install and states that the default installation creates a `nginx` GatewayClass.
+
+Contour installs from the official Gateway Provisioner quickstart manifest at `https://projectcontour.io/quickstart/contour-gateway-provisioner.yaml`. The script creates a `contour` GatewayClass using Contour's Gateway API controller name, `projectcontour.io/gateway-controller`.

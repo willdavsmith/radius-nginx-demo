@@ -4,6 +4,7 @@ extension gateways
 extension routes
 
 param environment string
+param gatewayClassName string = 'nginx'
 
 resource app 'Radius.Core/applications@2025-08-01-preview' = {
   name: 'nginx-radius-demo'
@@ -17,7 +18,7 @@ resource gateway 'Radius.Compute/gateways@2025-08-01-preview' = {
   properties: {
     environment: environment
     application: app.id
-    gatewayClassName: 'nginx'
+    gatewayClassName: gatewayClassName
     listeners: [
       {
         name: 'http'
