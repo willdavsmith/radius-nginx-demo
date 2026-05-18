@@ -1,0 +1,39 @@
+name: Radius Contour HTTPProxy E2E
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          curl -fsSL https://raw.githubusercontent.com/radius-project/radius/main/deploy/install.sh | /bin/bash
+          curl -fsSL https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64 -o "$HOME/.local/bin/kind"
+          chmod +x "$HOME/.local/bin/kind"
+          curl -fsSL https://github.com/oras-project/oras/releases/download/v1.2.2/oras_1.2.2_linux_amd64.tar.gz | tar -xz -C "$HOME/.local/bin" oras
+
+          helm version
+          kind version
+          rad version
+          oras version
+
+      - name: Run Radius with Contour HTTPProxy e2e
+        run: ./scripts/e2e-contour-httpproxy-radius.sh

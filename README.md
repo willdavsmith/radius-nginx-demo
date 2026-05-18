@@ -34,6 +34,15 @@ git submodule update --init --recursive
 ./scripts/e2e-contour-radius.sh
 ```
 
+## Contour HTTPProxy Demo
+
+The Contour HTTPProxy demo shows that the current built-in Contour behavior can also be mirrored through recipes. It installs Contour with HTTPProxy support, deploys the same Radius app, and uses alternate recipe variants that create a Contour `HTTPProxy` instead of Gateway API `Gateway` and `HTTPRoute` resources.
+
+```bash
+git submodule update --init --recursive
+./scripts/e2e-contour-httpproxy-radius.sh
+```
+
 The script leaves the cluster running for inspection. Clean it up with:
 
 ```bash
