@@ -1,7 +1,4 @@
 extension radius
-extension containers
-extension gateways
-extension routes
 
 param environment string
 param gatewayClassName string = 'nginx'
