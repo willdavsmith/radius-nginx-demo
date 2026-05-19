@@ -1,4 +1,7 @@
 extension radius
+extension containers
+extension gateways
+extension routes
 
 param environment string
 param gatewayClassName string = 'nginx'
@@ -10,7 +13,7 @@ resource app 'Radius.Core/applications@2025-08-01-preview' = {
   }
 }
 
-resource gateway 'Radius.Compute/gateways@2025-08-01-preview' = {
+resource gateway 'gateways:Radius.Compute/gateways@2025-08-01-preview' = {
   name: 'web'
   properties: {
     environment: environment
@@ -27,7 +30,7 @@ resource gateway 'Radius.Compute/gateways@2025-08-01-preview' = {
   }
 }
 
-resource web 'Radius.Compute/containers@2025-08-01-preview' = {
+resource web 'containers:Radius.Compute/containers@2025-08-01-preview' = {
   name: 'web'
   properties: {
     environment: environment
@@ -47,7 +50,7 @@ resource web 'Radius.Compute/containers@2025-08-01-preview' = {
   }
 }
 
-resource route 'Radius.Compute/routes@2025-08-01-preview' = {
+resource route 'routes:Radius.Compute/routes@2025-08-01-preview' = {
   name: 'web'
   properties: {
     environment: environment
