@@ -8,6 +8,8 @@ ENVIRONMENT="${ENVIRONMENT:-default}"
 WORKSPACE="${WORKSPACE:-default}"
 APP_NAME="${APP_NAME:-nginx-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-nginx-radius-demo}"
+ROUTE_HOSTNAME="${ROUTE_HOSTNAME:-nginx.example.com}"
+GATEWAY_NAME="${GATEWAY_NAME:-radius}"
 RECIPE_PACK_NAME="${RECIPE_PACK_NAME:-nginx-radius-demo-pack}"
 RECIPE_PACK_FILE="${CONTRIB_DIR}/nginx-radius-demo-recipe-pack.bicep"
 ORIGINAL_HOME="${HOME}"
@@ -40,13 +42,11 @@ cd "${CONTRIB_DIR}"
 make create-radius-cluster
 kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${APP_NAMESPACE}"
 rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
-"${ROOT_DIR}/scripts/install-nginx-gateway-fabric.sh"
+NGF_GATEWAY_NAMESPACE="${APP_NAMESPACE}" NGF_GATEWAY_NAME="${GATEWAY_NAME}" "${ROOT_DIR}/scripts/install-nginx-gateway-fabric.sh"
 
-make build-resource-type TYPE_FOLDER=Compute/gateways
 make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes
 
-make build-terraform-recipe RECIPE_PATH=Compute/gateways/recipes/kubernetes/terraform
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
 make build-terraform-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/terraform
 
@@ -58,10 +58,6 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
   location: 'global'
   properties: {
     recipes: {
-      'Radius.Compute/gateways': {
-        recipeKind: 'terraform'
-        recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/gateways-kubernetes.zip'
-      }
       'Radius.Compute/containers': {
         recipeKind: 'bicep'
         recipeLocation: 'reciperegistry:5000/radius-recipes/compute/containers/kubernetes/bicep/kubernetes-containers:latest'
@@ -71,7 +67,7 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         recipeKind: 'terraform'
         recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/routes-kubernetes.zip'
         parameters: {
-          gateway_name: 'web'
+          gateway_name: '${GATEWAY_NAME}'
           gateway_namespace: '${APP_NAMESPACE}'
         }
       }
@@ -86,9 +82,9 @@ rad env update "${ENVIRONMENT}" --recipe-packs "${RECIPE_PACK_NAME}" --preview
 cp ./*-extension.tgz "${ROOT_DIR}/"
 cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 
-rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}"
+rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
 
-kubectl wait --timeout=5m -n "${APP_NAMESPACE}" gateway/web --for=condition=Programmed
+kubectl wait --timeout=5m -n "${APP_NAMESPACE}" gateway/"${GATEWAY_NAME}" --for=condition=Programmed
 for _ in {1..30}; do
   ROUTE_STATUS="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '
     .items as $routes |
@@ -109,13 +105,13 @@ if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
   exit 1
 fi
 
-SERVICE_NAME="$(kubectl get service -n "${APP_NAMESPACE}" -l gateway.networking.k8s.io/gateway-name=web -o jsonpath='{.items[0].metadata.name}')"
+SERVICE_NAME="$(kubectl get service -n "${APP_NAMESPACE}" -l gateway.networking.k8s.io/gateway-name="${GATEWAY_NAME}" -o jsonpath='{.items[0].metadata.name}')"
 kubectl port-forward -n "${APP_NAMESPACE}" "service/${SERVICE_NAME}" 8080:80 >/tmp/radius-nginx-demo-port-forward.log 2>&1 &
 PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
 for _ in {1..30}; do
-  if curl -fsS http://127.0.0.1:8080/ >/tmp/radius-nginx-demo-response.html; then
+  if curl -fsS -H "Host: ${ROUTE_HOSTNAME}" http://127.0.0.1:8080/ >/tmp/radius-nginx-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-nginx-demo-response.html
     echo "E2E succeeded: Radius app responded through NGINX Gateway Fabric."
     exit 0

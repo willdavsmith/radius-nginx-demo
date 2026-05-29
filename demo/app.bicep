@@ -1,32 +1,14 @@
 extension radius
 extension containers
-extension gateways
 extension routes
 
 param environment string
-param gatewayClassName string = 'nginx'
+param routeHostname string = 'web.example.com'
 
 resource app 'Radius.Core/applications@2025-08-01-preview' = {
   name: 'nginx-radius-demo'
   properties: {
     environment: environment
-  }
-}
-
-resource gateway 'gateways:Radius.Compute/gateways@2025-08-01-preview' = {
-  name: 'web'
-  properties: {
-    environment: environment
-    application: app.id
-    gatewayClassName: gatewayClassName
-    listeners: [
-      {
-        name: 'http'
-        protocol: 'HTTP'
-        port: 80
-        allowedRoutesFrom: 'All'
-      }
-    ]
   }
 }
 
@@ -56,6 +38,9 @@ resource route 'routes:Radius.Compute/routes@2025-08-01-preview' = {
     environment: environment
     application: app.id
     kind: 'HTTP'
+    hostnames: [
+      routeHostname
+    ]
     rules: [
       {
         matches: [
@@ -71,7 +56,4 @@ resource route 'routes:Radius.Compute/routes@2025-08-01-preview' = {
       }
     ]
   }
-  dependsOn: [
-    gateway
-  ]
 }

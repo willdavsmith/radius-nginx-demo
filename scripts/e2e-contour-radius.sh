@@ -7,8 +7,10 @@ DEMO_APP="${ROOT_DIR}/demo/app.bicep"
 ENVIRONMENT="${ENVIRONMENT:-default}"
 APP_NAME="${APP_NAME:-contour-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-contour-radius-demo}"
-GATEWAY_CLASS_NAME="${GATEWAY_CLASS_NAME:-contour}"
+ROUTE_HOSTNAME="${ROUTE_HOSTNAME:-contour.example.com}"
 CONTOUR_NAMESPACE="${CONTOUR_NAMESPACE:-projectcontour}"
+GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-radius-system}"
+GATEWAY_NAME="${GATEWAY_NAME:-radius}"
 RECIPE_PACK_NAME="${RECIPE_PACK_NAME:-contour-radius-demo-pack}"
 RECIPE_PACK_FILE="${CONTRIB_DIR}/contour-radius-demo-recipe-pack.bicep"
 ORIGINAL_HOME="${HOME}"
@@ -43,11 +45,9 @@ kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create names
 rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
 "${ROOT_DIR}/scripts/install-contour-gateway-provisioner.sh"
 
-make build-resource-type TYPE_FOLDER=Compute/gateways
 make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes
 
-make build-terraform-recipe RECIPE_PATH=Compute/gateways/recipes/kubernetes/terraform
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
 make build-terraform-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/terraform
 
@@ -59,10 +59,6 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
   location: 'global'
   properties: {
     recipes: {
-      'Radius.Compute/gateways': {
-        recipeKind: 'terraform'
-        recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/gateways-kubernetes.zip'
-      }
       'Radius.Compute/containers': {
         recipeKind: 'bicep'
         recipeLocation: 'reciperegistry:5000/radius-recipes/compute/containers/kubernetes/bicep/kubernetes-containers:latest'
@@ -71,10 +67,6 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
       'Radius.Compute/routes': {
         recipeKind: 'terraform'
         recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/routes-kubernetes.zip'
-        parameters: {
-          gateway_name: 'web'
-          gateway_namespace: '${APP_NAMESPACE}'
-        }
       }
     }
   }
@@ -87,9 +79,9 @@ rad env update "${ENVIRONMENT}" --recipe-packs "${RECIPE_PACK_NAME}" --preview
 cp ./*-extension.tgz "${ROOT_DIR}/"
 cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 
-rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p gatewayClassName="${GATEWAY_CLASS_NAME}"
+rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
 
-kubectl wait --timeout=5m -n "${APP_NAMESPACE}" gateway/web --for=condition=Programmed
+kubectl wait --timeout=5m -n "${GATEWAY_NAMESPACE}" gateway/"${GATEWAY_NAME}" --for=condition=Programmed
 for _ in {1..30}; do
   ROUTE_STATUS="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '
     .items as $routes |
@@ -113,6 +105,16 @@ fi
 ENVOY_SERVICE_NAMESPACE=""
 ENVOY_SERVICE_NAME=""
 for _ in {1..30}; do
+  if kubectl get service -n "${GATEWAY_NAMESPACE}" "envoy-${GATEWAY_NAME}" >/dev/null 2>&1; then
+    ENVOY_SERVICE_NAMESPACE="${GATEWAY_NAMESPACE}"
+    ENVOY_SERVICE_NAME="envoy-${GATEWAY_NAME}"
+    break
+  fi
+  if kubectl get service -n "${GATEWAY_NAMESPACE}" envoy >/dev/null 2>&1; then
+    ENVOY_SERVICE_NAMESPACE="${GATEWAY_NAMESPACE}"
+    ENVOY_SERVICE_NAME="envoy"
+    break
+  fi
   if kubectl get service -n "${APP_NAMESPACE}" envoy-web >/dev/null 2>&1; then
     ENVOY_SERVICE_NAMESPACE="${APP_NAMESPACE}"
     ENVOY_SERVICE_NAME="envoy-web"
@@ -133,7 +135,8 @@ done
 
 if [[ -z "${ENVOY_SERVICE_NAMESPACE}" ]]; then
   echo "E2E failed: Contour Envoy service was not created." >&2
-  kubectl get gateway -n "${APP_NAMESPACE}" -o yaml >&2 || true
+  kubectl get gateway -n "${GATEWAY_NAMESPACE}" -o yaml >&2 || true
+  kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
   kubectl get pods,svc -n "${APP_NAMESPACE}" >&2 || true
   kubectl get pods,svc -n "${CONTOUR_NAMESPACE}" >&2 || true
   exit 1
@@ -144,7 +147,7 @@ PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
 for _ in {1..30}; do
-  if curl -fsS http://127.0.0.1:8080/ >/tmp/radius-contour-demo-response.html; then
+  if curl -fsS -H "Host: ${ROUTE_HOSTNAME}" http://127.0.0.1:8080/ >/tmp/radius-contour-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-contour-demo-response.html
     echo "E2E succeeded: Radius app responded through Contour Gateway API."
     exit 0
@@ -154,5 +157,6 @@ done
 
 echo "E2E failed: application did not respond through Contour." >&2
 kubectl get gateway,httproute,pods,svc -n "${APP_NAMESPACE}" >&2 || true
+kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
 kubectl get pods,svc -n "${CONTOUR_NAMESPACE}" >&2 || true
 exit 1
