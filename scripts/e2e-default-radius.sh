@@ -60,7 +60,7 @@ data:
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
 
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
 
 rad install kubernetes \
   --chart "${RADIUS_DIR}/deploy/Chart" \
@@ -81,8 +81,7 @@ make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/
 make build-bicep-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/bicep/kubernetes-routes.bicep
 
 cd "${ROOT_DIR}"
-rad bicep publish-extension -f "${RADIUS_DIR}/deploy/manifest/built-in-providers/self-hosted/radius_core.yaml" --target "${ROOT_DIR}/radius-extension.tgz" --force
-rad bicep publish-extension -f "${RADIUS_DIR}/deploy/manifest/built-in-providers/self-hosted/radius_compute.yaml" --target "${ROOT_DIR}/radiuscompute-extension.tgz" --force
+"${HOME}/.rad/bin/bicep" publish-extension "${RADIUS_DIR}/hack/bicep-types-radius/generated/index.json" --target "${ROOT_DIR}/radius-extension.tgz" --force
 
 cat > "${ROOT_DIR}/bicepconfig.json" <<EOF
 {
@@ -91,7 +90,7 @@ cat > "${ROOT_DIR}/bicepconfig.json" <<EOF
   },
   "extensions": {
     "radius": "./radius-extension.tgz",
-    "radiusCompute": "./radiuscompute-extension.tgz"
+    "radiusCompute": "./radius-extension.tgz"
   }
 }
 EOF
