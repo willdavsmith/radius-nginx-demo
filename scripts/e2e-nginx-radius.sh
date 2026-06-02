@@ -69,8 +69,8 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
         plainHttp: true
         parameters: {
-          gateway_name: '${GATEWAY_NAME}'
-          gateway_namespace: '${APP_NAMESPACE}'
+          gatewayName: '${GATEWAY_NAME}'
+          gatewayNamespace: '${APP_NAMESPACE}'
         }
       }
     }
