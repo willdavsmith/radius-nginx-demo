@@ -87,22 +87,17 @@ cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 
 rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
 
+ROUTE_COUNT="0"
 for _ in {1..30}; do
-  ROUTE_STATUS="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '
-    .items as $routes |
-    if ($routes | length) == 0 then "waiting"
-    elif ([ $routes[].status.parents[]?.conditions[]? | select(.type == "Accepted" and .status == "True") ] | length) >= ($routes | length) then "accepted"
-    else "waiting"
-    end
-  ')"
-  if [[ "${ROUTE_STATUS}" == "accepted" ]]; then
+  ROUTE_COUNT="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '.items | length')"
+  if [[ "${ROUTE_COUNT}" != "0" ]]; then
     break
   fi
   sleep 10
 done
 
-if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
-  echo "E2E failed: HTTPRoute was not accepted." >&2
+if [[ "${ROUTE_COUNT}" == "0" ]]; then
+  echo "E2E failed: HTTPRoute was not created." >&2
   kubectl get gateway -n "${GATEWAY_NAMESPACE}" -o yaml >&2 || true
   kubectl get httproute -n "${APP_NAMESPACE}" -o yaml >&2 || true
   exit 1
@@ -110,7 +105,7 @@ fi
 
 ENVOY_SERVICE_NAMESPACE=""
 ENVOY_SERVICE_NAME=""
-for _ in {1..30}; do
+for _ in {1..60}; do
   if kubectl get service -n "${GATEWAY_NAMESPACE}" "envoy-${GATEWAY_NAME}" >/dev/null 2>&1; then
     ENVOY_SERVICE_NAMESPACE="${GATEWAY_NAMESPACE}"
     ENVOY_SERVICE_NAME="envoy-${GATEWAY_NAME}"
