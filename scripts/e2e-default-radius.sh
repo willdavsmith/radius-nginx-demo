@@ -140,9 +140,11 @@ if [[ "${ROUTE_COUNT}" == "0" ]]; then
 fi
 
 ENVOY_TARGET=""
+ENVOY_TARGET_PORT="80"
 for _ in {1..60}; do
   ENVOY_TARGET="$(kubectl get pods -n "${GATEWAY_NAMESPACE}" -o name | awk '/^pod\/contour-envoy-/ { print; exit }')"
   if [[ -n "${ENVOY_TARGET}" ]]; then
+    ENVOY_TARGET_PORT="8080"
     break
   fi
   if kubectl get service -n "${GATEWAY_NAMESPACE}" "envoy-${GATEWAY_NAME}" >/dev/null 2>&1; then
@@ -163,7 +165,7 @@ if [[ -z "${ENVOY_TARGET}" ]]; then
   exit 1
 fi
 
-kubectl port-forward -n "${GATEWAY_NAMESPACE}" "${ENVOY_TARGET}" 8080:80 >/tmp/radius-default-demo-port-forward.log 2>&1 &
+kubectl port-forward -n "${GATEWAY_NAMESPACE}" "${ENVOY_TARGET}" 8080:"${ENVOY_TARGET_PORT}" >/tmp/radius-default-demo-port-forward.log 2>&1 &
 PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
