@@ -123,7 +123,6 @@ rad env update "${ENVIRONMENT}" --recipe-packs default --preview
 
 rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
 
-kubectl wait --timeout=5m -n "${GATEWAY_NAMESPACE}" gateway/"${GATEWAY_NAME}" --for=condition=Programmed
 for _ in {1..30}; do
   ROUTE_STATUS="$(kubectl get httproute -n "${APP_NAMESPACE}" -o json | jq -r '
     .items as $routes |
@@ -140,6 +139,7 @@ done
 
 if [[ "${ROUTE_STATUS}" != "accepted" ]]; then
   echo "E2E failed: HTTPRoute was not accepted." >&2
+  kubectl get gateway -n "${GATEWAY_NAMESPACE}" -o yaml >&2 || true
   kubectl get httproute -n "${APP_NAMESPACE}" -o yaml >&2 || true
   exit 1
 fi
