@@ -15,6 +15,7 @@ RECIPE_PACK_FILE="${CONTRIB_DIR}/nginx-radius-demo-recipe-pack.bicep"
 ORIGINAL_HOME="${HOME}"
 E2E_HOME="${E2E_HOME:-$(mktemp -d)}"
 export HOME="${E2E_HOME}"
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR="${DOTNET_BUNDLE_EXTRACT_BASE_DIR:-/tmp/dotnet-bundle-extract}"
 mkdir -p "${HOME}"
 if [[ -d "${ORIGINAL_HOME}/.rad/bin" && ! -e "${HOME}/.rad/bin" ]]; then
   mkdir -p "${HOME}/.rad"
@@ -48,7 +49,7 @@ make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes
 
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
-make build-terraform-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/terraform
+make build-bicep-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/bicep/kubernetes-routes.bicep
 
 cat > "${RECIPE_PACK_FILE}" <<EOF
 extension radius
@@ -64,8 +65,9 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         plainHttp: true
       }
       'Radius.Compute/routes': {
-        recipeKind: 'terraform'
-        recipeLocation: 'http://tf-module-server.radius-test-tf-module-server.svc.cluster.local/routes-kubernetes.zip'
+        recipeKind: 'bicep'
+        recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
+        plainHttp: true
         parameters: {
           gateway_name: '${GATEWAY_NAME}'
           gateway_namespace: '${APP_NAMESPACE}'
