@@ -60,6 +60,8 @@ data:
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
 
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+
 rad install kubernetes \
   --chart "${RADIUS_DIR}/deploy/Chart" \
   --set rp.publicEndpointOverride=localhost:8081 \
