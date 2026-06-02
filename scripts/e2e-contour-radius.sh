@@ -9,7 +9,7 @@ APP_NAME="${APP_NAME:-contour-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-contour-radius-demo}"
 ROUTE_HOSTNAME="${ROUTE_HOSTNAME:-contour.example.com}"
 CONTOUR_NAMESPACE="${CONTOUR_NAMESPACE:-projectcontour}"
-GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-radius-system}"
+GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-${APP_NAMESPACE}}"
 GATEWAY_NAME="${GATEWAY_NAME:-radius}"
 RECIPE_PACK_NAME="${RECIPE_PACK_NAME:-contour-radius-demo-pack}"
 RECIPE_PACK_FILE="${CONTRIB_DIR}/contour-radius-demo-recipe-pack.bicep"
@@ -44,8 +44,7 @@ cd "${CONTRIB_DIR}"
 make create-radius-cluster
 kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${APP_NAMESPACE}"
 rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
-"${ROOT_DIR}/scripts/install-contour-gateway-provisioner.sh"
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
+RADIUS_GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE}" RADIUS_GATEWAY_NAME="${GATEWAY_NAME}" "${ROOT_DIR}/scripts/install-contour-gateway-provisioner.sh"
 
 make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes
@@ -70,6 +69,10 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         recipeKind: 'bicep'
         recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
         plainHttp: true
+        parameters: {
+          gatewayName: '${GATEWAY_NAME}'
+          gatewayNamespace: '${GATEWAY_NAMESPACE}'
+        }
       }
     }
   }

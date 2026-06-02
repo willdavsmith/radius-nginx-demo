@@ -46,11 +46,11 @@ resource route 'radiusCompute:Radius.Compute/routes@2025-08-01-preview' = {
             httpPath: '/'
           }
         ]
-        destinationContainer: {
+        destinationContainer: any({
           resourceId: web.id
           containerName: 'web'
           containerPort: web.properties.containers.web.ports.http.containerPort
-        }
+        })
       }
     ]
   }
