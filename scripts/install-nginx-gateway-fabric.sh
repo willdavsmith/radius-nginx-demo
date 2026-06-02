@@ -8,7 +8,7 @@ NGF_GATEWAY_NAMESPACE="${NGF_GATEWAY_NAMESPACE:-default-nginx-radius-demo}"
 NGF_GATEWAY_NAME="${NGF_GATEWAY_NAME:-radius}"
 
 echo "Installing Gateway API CRDs for NGINX Gateway Fabric ${NGF_VERSION}..."
-kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=${NGF_VERSION}" | kubectl apply -f -
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
 
 echo "Installing NGINX Gateway Fabric..."
 helm upgrade --install "${NGF_RELEASE}" oci://ghcr.io/nginx/charts/nginx-gateway-fabric \

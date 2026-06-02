@@ -44,7 +44,6 @@ make create-radius-cluster
 kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${APP_NAMESPACE}"
 rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
 NGF_GATEWAY_NAMESPACE="${APP_NAMESPACE}" NGF_GATEWAY_NAME="${GATEWAY_NAME}" "${ROOT_DIR}/scripts/install-nginx-gateway-fabric.sh"
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
 
 make build-resource-type TYPE_FOLDER=Compute/containers
 make build-resource-type TYPE_FOLDER=Compute/routes

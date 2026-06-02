@@ -90,7 +90,7 @@ cat > "${ROOT_DIR}/bicepconfig.json" <<EOF
   },
   "extensions": {
     "radius": "./radius-extension.tgz",
-    "radiusCompute": "./radius-extension.tgz"
+    "radiusCompute": "br:biceptypes.azurecr.io/radiuscompute:latest"
   }
 }
 EOF
