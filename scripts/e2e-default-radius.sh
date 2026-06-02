@@ -139,31 +139,47 @@ if [[ "${ROUTE_COUNT}" == "0" ]]; then
   exit 1
 fi
 
-SERVICE_NAME=""
+ENVOY_TARGET=""
 for _ in {1..60}; do
+  ENVOY_TARGET="$(kubectl get pods -n "${GATEWAY_NAMESPACE}" -o name | awk '/^pod\/contour-envoy-/ { print; exit }')"
+  if [[ -n "${ENVOY_TARGET}" ]]; then
+    break
+  fi
   if kubectl get service -n "${GATEWAY_NAMESPACE}" "envoy-${GATEWAY_NAME}" >/dev/null 2>&1; then
-    SERVICE_NAME="envoy-${GATEWAY_NAME}"
+    ENVOY_TARGET="service/envoy-${GATEWAY_NAME}"
     break
   fi
   if kubectl get service -n "${GATEWAY_NAMESPACE}" contour-envoy >/dev/null 2>&1; then
-    SERVICE_NAME="contour-envoy"
+    ENVOY_TARGET="service/contour-envoy"
     break
   fi
   sleep 5
 done
 
-if [[ -z "${SERVICE_NAME}" ]]; then
+if [[ -z "${ENVOY_TARGET}" ]]; then
   echo "E2E failed: Contour Envoy service was not created." >&2
   kubectl get gateway -n "${GATEWAY_NAMESPACE}" -o yaml >&2 || true
   kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
   exit 1
 fi
 
-kubectl port-forward -n "${GATEWAY_NAMESPACE}" "service/${SERVICE_NAME}" 8080:80 >/tmp/radius-default-demo-port-forward.log 2>&1 &
+kubectl port-forward -n "${GATEWAY_NAMESPACE}" "${ENVOY_TARGET}" 8080:80 >/tmp/radius-default-demo-port-forward.log 2>&1 &
 PF_PID=$!
 trap 'kill ${PF_PID} >/dev/null 2>&1 || true' EXIT
 
 for _ in {1..30}; do
+  if ! kill -0 "${PF_PID}" >/dev/null 2>&1; then
+    echo "E2E failed: Contour port-forward exited early." >&2
+    cat /tmp/radius-default-demo-port-forward.log >&2 || true
+    exit 1
+  fi
+  if grep -q "Forwarding from" /tmp/radius-default-demo-port-forward.log 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+for _ in {1..60}; do
   if curl -fsS -H "Host: ${ROUTE_HOSTNAME}" http://127.0.0.1:8080/ >/tmp/radius-default-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html
     echo "E2E succeeded: default Radius install routed traffic through Contour Gateway API."
@@ -173,6 +189,7 @@ for _ in {1..30}; do
 done
 
 echo "E2E failed: application did not respond through default Contour Gateway." >&2
+cat /tmp/radius-default-demo-port-forward.log >&2 || true
 kubectl get gateway,httproute,pods,svc -n "${APP_NAMESPACE}" >&2 || true
 kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
 exit 1
