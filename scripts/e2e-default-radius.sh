@@ -139,15 +139,15 @@ if [[ "${ROUTE_COUNT}" == "0" ]]; then
   exit 1
 fi
 
-for _ in {1..60}; do
+for _ in {1..20}; do
   kubectl delete pod radius-default-curl -n "${APP_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
   kubectl run radius-default-curl \
     -n "${APP_NAMESPACE}" \
     --restart=Never \
     --image=curlimages/curl:8.15.0 \
     --image-pull-policy=IfNotPresent \
-    --command -- sh -c "curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H 'Host: ${ROUTE_HOSTNAME}' 'http://contour-envoy.${GATEWAY_NAMESPACE}.svc.cluster.local/'" >/dev/null
-  kubectl wait --timeout=30s -n "${APP_NAMESPACE}" pod/radius-default-curl --for=jsonpath='{.status.phase}'=Succeeded >/dev/null 2>&1 || true
+    --command -- sh -c "curl -sS --connect-timeout 5 --max-time 10 -w '\nHTTP_STATUS:%{http_code}\n' -H 'Host: ${ROUTE_HOSTNAME}' 'http://contour-envoy.${GATEWAY_NAMESPACE}.svc.cluster.local/'" >/dev/null
+  kubectl wait --timeout=20s -n "${APP_NAMESPACE}" pod/radius-default-curl --for=jsonpath='{.status.phase}'=Succeeded >/dev/null 2>&1 || true
   kubectl logs -n "${APP_NAMESPACE}" radius-default-curl >/tmp/radius-default-demo-response.html 2>/tmp/radius-default-demo-curl.log || true
   if grep -q "HTTP_STATUS:200" /tmp/radius-default-demo-response.html && grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html
