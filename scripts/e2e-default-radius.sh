@@ -139,23 +139,16 @@ if [[ "${ROUTE_COUNT}" == "0" ]]; then
   exit 1
 fi
 
-ENVOY_NODE_PORT=""
 for _ in {1..60}; do
-  ENVOY_NODE_PORT="$(kubectl get service -n "${GATEWAY_NAMESPACE}" contour-envoy -o json | jq -r '.spec.ports[] | select(.port == 80) | .nodePort // empty')"
-  if [[ -n "${ENVOY_NODE_PORT}" ]]; then
-    break
-  fi
-  sleep 2
-done
-
-if [[ -z "${ENVOY_NODE_PORT}" ]]; then
-  echo "E2E failed: Contour Envoy service did not expose an HTTP NodePort." >&2
-  kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
-  exit 1
-fi
-
-for _ in {1..60}; do
-  if docker run --rm --network kind curlimages/curl:8.15.0 -fsS -H "Host: ${ROUTE_HOSTNAME}" "http://radius-control-plane:${ENVOY_NODE_PORT}/" >/tmp/radius-default-demo-response.html; then
+  kubectl delete pod radius-default-curl -n "${APP_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+  if kubectl run radius-default-curl \
+    -n "${APP_NAMESPACE}" \
+    --rm \
+    -i \
+    --restart=Never \
+    --image=curlimages/curl:8.15.0 \
+    --image-pull-policy=IfNotPresent \
+    --command -- curl -fsS -H "Host: ${ROUTE_HOSTNAME}" "http://contour-envoy.${GATEWAY_NAMESPACE}.svc.cluster.local/" >/tmp/radius-default-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html
     echo "E2E succeeded: default Radius install routed traffic through Contour Gateway API."
     exit 0
