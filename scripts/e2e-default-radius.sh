@@ -141,14 +141,15 @@ fi
 
 for _ in {1..60}; do
   kubectl delete pod radius-default-curl -n "${APP_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
-  if kubectl run radius-default-curl \
+  kubectl run radius-default-curl \
     -n "${APP_NAMESPACE}" \
-    --rm \
-    -i \
     --restart=Never \
     --image=curlimages/curl:8.15.0 \
     --image-pull-policy=IfNotPresent \
-    --command -- curl -fsS -H "Host: ${ROUTE_HOSTNAME}" "http://contour-envoy.${GATEWAY_NAMESPACE}.svc.cluster.local/" >/tmp/radius-default-demo-response.html; then
+    --command -- sh -c "curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H 'Host: ${ROUTE_HOSTNAME}' 'http://contour-envoy.${GATEWAY_NAMESPACE}.svc.cluster.local/'" >/dev/null
+  kubectl wait --timeout=30s -n "${APP_NAMESPACE}" pod/radius-default-curl --for=jsonpath='{.status.phase}'=Succeeded >/dev/null 2>&1 || true
+  kubectl logs -n "${APP_NAMESPACE}" radius-default-curl >/tmp/radius-default-demo-response.html 2>/tmp/radius-default-demo-curl.log || true
+  if grep -q "HTTP_STATUS:200" /tmp/radius-default-demo-response.html && grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html; then
     grep -qi "welcome to nginx" /tmp/radius-default-demo-response.html
     echo "E2E succeeded: default Radius install routed traffic through Contour Gateway API."
     exit 0
@@ -157,6 +158,8 @@ for _ in {1..60}; do
 done
 
 echo "E2E failed: application did not respond through default Contour Gateway." >&2
+cat /tmp/radius-default-demo-response.html >&2 || true
+cat /tmp/radius-default-demo-curl.log >&2 || true
 kubectl get gateway,httproute,pods,svc -n "${APP_NAMESPACE}" >&2 || true
 kubectl get pods,svc -n "${GATEWAY_NAMESPACE}" >&2 || true
 exit 1
