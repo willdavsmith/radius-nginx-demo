@@ -6,6 +6,7 @@ CONTRIB_DIR="${ROOT_DIR}/submodules/resource-types-contrib"
 RADIUS_DIR="${ROOT_DIR}/submodules/radius"
 DEMO_APP="${ROOT_DIR}/demo/default-radius-app.bicep"
 ENVIRONMENT="${ENVIRONMENT:-default}"
+ENVIRONMENT_ID="/planes/radius/local/resourcegroups/default/providers/Radius.Core/environments/${ENVIRONMENT}"
 APP_NAME="${APP_NAME:-default-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-radius-demo}"
 ROUTE_HOSTNAME="${ROUTE_HOSTNAME:-default.example.com}"
@@ -42,7 +43,7 @@ cd "${ROOT_DIR}"
 
 kind create cluster --name radius
 
-if ! docker ps | grep -q "reciperegistry"; then
+if [[ "$(docker inspect -f '{{.State.Running}}' reciperegistry 2>/dev/null || true)" != "true" ]]; then
   docker run -d --restart=always -p 5000:5000 --name reciperegistry registry:2
   docker network connect kind reciperegistry || true
 fi
@@ -59,8 +60,6 @@ data:
     hostFromContainerRuntime: "reciperegistry:5000"
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
-
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
 
 rad install kubernetes \
   --chart "${RADIUS_DIR}/deploy/Chart" \
@@ -112,16 +111,20 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
         recipeKind: 'bicep'
         recipeLocation: 'reciperegistry:5000/radius-recipes/compute/routes/kubernetes/bicep/kubernetes-routes:latest'
         plainHttp: true
+        parameters: {
+          gatewayName: '${GATEWAY_NAME}'
+          gatewayNamespace: '${GATEWAY_NAMESPACE}'
+        }
       }
     }
   }
 }
 EOF
 
-rad deploy "${RECIPE_PACK_FILE}" --group default -e "${ENVIRONMENT}"
+rad deploy "${RECIPE_PACK_FILE}" --group default -e "${ENVIRONMENT_ID}"
 rad env update "${ENVIRONMENT}" --recipe-packs default --preview
 
-rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
+rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT_ID}" -p routeHostname="${ROUTE_HOSTNAME}"
 
 ROUTE_COUNT="0"
 for _ in {1..30}; do

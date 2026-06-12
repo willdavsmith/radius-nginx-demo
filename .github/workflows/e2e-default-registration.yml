@@ -1,0 +1,50 @@
+name: Radius Default Registration E2E
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: submodules/radius/go.mod
+          cache-dependency-path: submodules/radius/go.sum
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          curl -fsSL https://raw.githubusercontent.com/radius-project/radius/main/deploy/install.sh | /bin/bash
+          curl -fsSL https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64 -o "$HOME/.local/bin/kind"
+          chmod +x "$HOME/.local/bin/kind"
+
+          helm version
+          kind version
+          rad version
+
+      - name: Build Radius CLI from submodule
+        run: |
+          set -euo pipefail
+          cd submodules/radius
+          go build -o "$HOME/.local/bin/rad" ./cmd/rad
+          rad version
+
+      - name: Run default registration e2e
+        run: ./scripts/e2e-default-registration.sh

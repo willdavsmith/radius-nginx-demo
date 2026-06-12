@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRIB_DIR="${ROOT_DIR}/submodules/resource-types-contrib"
 DEMO_APP="${ROOT_DIR}/demo/app.bicep"
 ENVIRONMENT="${ENVIRONMENT:-default}"
+ENVIRONMENT_ID="/planes/radius/local/resourcegroups/default/providers/Radius.Core/environments/${ENVIRONMENT}"
 WORKSPACE="${WORKSPACE:-default}"
 APP_NAME="${APP_NAME:-nginx-radius-demo}"
 APP_NAMESPACE="${APP_NAMESPACE:-default-nginx-radius-demo}"
@@ -45,8 +46,10 @@ kubectl get namespace "${APP_NAMESPACE}" >/dev/null 2>&1 || kubectl create names
 rad env update "${ENVIRONMENT}" --kubernetes-namespace "${APP_NAMESPACE}" --preview
 NGF_GATEWAY_NAMESPACE="${APP_NAMESPACE}" NGF_GATEWAY_NAME="${GATEWAY_NAME}" "${ROOT_DIR}/scripts/install-nginx-gateway-fabric.sh"
 
-make build-resource-type TYPE_FOLDER=Compute/containers
-make build-resource-type TYPE_FOLDER=Compute/routes
+"${BASH}" .github/scripts/build-resource-type.sh Compute/containers
+./.github/scripts/update-bicepconfig.sh
+"${BASH}" .github/scripts/build-resource-type.sh Compute/routes
+./.github/scripts/update-bicepconfig.sh
 
 make build-bicep-recipe RECIPE_PATH=Compute/containers/recipes/kubernetes/bicep/kubernetes-containers.bicep
 make build-bicep-recipe RECIPE_PATH=Compute/routes/recipes/kubernetes/bicep/kubernetes-routes.bicep
@@ -78,13 +81,13 @@ resource recipePack 'Radius.Core/recipePacks@2025-08-01-preview' = {
 }
 EOF
 
-rad deploy "${RECIPE_PACK_FILE}" --group default -e "${ENVIRONMENT}"
+rad deploy "${RECIPE_PACK_FILE}" --group default -e "${ENVIRONMENT_ID}"
 rad env update "${ENVIRONMENT}" --recipe-packs "${RECIPE_PACK_NAME}" --preview
 
 cp ./*-extension.tgz "${ROOT_DIR}/"
 cp bicepconfig.json "${ROOT_DIR}/bicepconfig.json"
 
-rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT}" -p routeHostname="${ROUTE_HOSTNAME}"
+rad deploy "${DEMO_APP}" --application "${APP_NAME}" -e "${ENVIRONMENT_ID}" -p routeHostname="${ROUTE_HOSTNAME}"
 
 kubectl wait --timeout=5m -n "${APP_NAMESPACE}" gateway/"${GATEWAY_NAME}" --for=condition=Programmed
 for _ in {1..30}; do
